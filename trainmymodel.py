@@ -1,15 +1,4 @@
-80% of storage used … If you run out of space, you can't save to Drive, back up Google Photos, or use Gmail.
-"""
-Improved EPI Model Training Script - Simplified Version
-Cải tiến chính:
-1. Thêm Early Stopping (patience=20)
-2. Cải thiện memory management
-3. Better logging và tracking metrics
-4. Tối ưu hóa DataLoader
-5. Giữ nguyên attention monitoring đơn giản
-6. Lưu heatmap của attention weights
-7. Không show plot, chỉ save file
-"""
+
 
 import torch
 import torch.nn as nn
@@ -24,7 +13,7 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import json

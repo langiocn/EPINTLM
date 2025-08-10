@@ -1,4 +1,4 @@
-80% of storage used … If you run out of space, you can't save to Drive, back up Google Photos, or use Gmail.
+
 from torch import nn
 import torch
 import numpy as np
@@ -9,7 +9,6 @@ NUMBER_WORDS = 4097
 NUMBER_POS = 70
 
 
-#网络参数
 EMBEDDING_DIM = 1280
 CNN_KERNEL_SIZE = 40
 POOL_KERNEL_SIZE = 20
@@ -77,7 +76,6 @@ class EPIModel(nn.Module):
 
         self.self_attn_gen= ImprovedAttention(embed_dim=64, num_heads=8)
 
-        #self.MTHEAD = nn.MultiheadAttention(embed_dim=64,num_heads=8)
 
         
         self.layer_norm = nn.LayerNorm(EMBEDDING_DIM)
@@ -92,12 +90,8 @@ class EPIModel(nn.Module):
                )
    
 
-        
-        
-        
-        #self.criterion = nn.BCEWithLogitsLoss()
         self.criterion = nn.BCELoss()
-        # self.optimizer = torch.optim.Adam(self.parameters(), lr=LEARNING_RATE, weight_decay=0.001)
+
         
 
     def init_weights(self):
@@ -111,7 +105,6 @@ class EPIModel(nn.Module):
         
         
     def forward(self, enhancer_ids, promoter_ids, gene_data):
-        SAMPLE_SIZE = enhancer_ids.size(0)
 
         enhancer_embedding = self.embedding_en(enhancer_ids)
         promoter_embedding = self.embedding_pr(promoter_ids)
