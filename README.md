@@ -1,4 +1,4 @@
-This repository contains the implementation of **"EPINTLM: Residual Cross-Attention for Enhancer–Promoter Prediction with Pretrained k-mer Embeddings"** for predicting enhancer–promoter interactions.
+This repository contains the implementation of "EPINTLM: Residual Cross-Attention for Enhancer–Promoter Prediction with Pretrained k-mer Embeddings" for predicting enhancer–promoter interactions.
 
 **Pretrained model checkpoints**: https://drive.google.com/drive/folders/18DHZgsJqupNTnWmPrRiA3F1SrMro2q_H?usp=sharing
 
