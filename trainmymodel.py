@@ -1,11 +1,10 @@
 
-
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Subset
 from torch.optim.lr_scheduler import MultiStepLR
 from L5.mymodel5 import EPIModel
-from sklearn.metrics import average_precision_score, roc_auc_score
+from sklearn.metrics import average_precision_score, roc_auc_score, accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.manifold import TSNE
 from process_data_3 import CombinedDataset
@@ -13,7 +12,7 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 import seaborn as sns
 import json
@@ -25,7 +24,6 @@ from datetime import datetime
 
 # ============= CONFIGURATION =============
 class Config:
-    """Simple configuration class"""
     def __init__(self):
         # Training parameters
         self.batch_size = 256
@@ -44,7 +42,7 @@ class Config:
         self.checkpoint_dir = "./checkpoints/"
         self.best_checkpoint_dir = "./best_checkpoints/"
         self.attention_dir = "./attention_analysis/"
-        self.data_path = './data/nu_HUVEC_combined_dataset.pt'
+        self.data_path = './data/nu_HeLa_combined_dataset.pt'
         
         # Monitoring frequency
         self.plot_freq = 5
@@ -57,22 +55,20 @@ class Config:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
     def create_dirs(self):
-        """Create necessary directories"""
         for dir_path in [self.checkpoint_dir, self.best_checkpoint_dir, self.attention_dir]:
             os.makedirs(dir_path, exist_ok=True)
 
 
 # ============= EARLY STOPPING =============
 class EarlyStopping:
-    """Simple early stopping implementation"""
-    def __init__(self, patience=20, min_delta=1e-4, verbose=True):
+    def __init__(self, patience=10, min_delta=1e-4, verbose=True):
         self.patience = patience
         self.min_delta = min_delta
         self.verbose = verbose
         self.counter = 0
         self.best_score = None
         self.early_stop = False
-        
+
     def __call__(self, val_score):
         if self.best_score is None:
             self.best_score = val_score
@@ -90,7 +86,6 @@ class EarlyStopping:
 
 # ============= ENHANCED ATTENTION MONITOR =============
 class AttentionMonitor:
-    """Attention monitoring with heatmap visualization"""
     
     def __init__(self, save_dir="attention_analysis"):
         self.save_dir = save_dir
@@ -101,7 +96,6 @@ class AttentionMonitor:
         self.epoch_metrics = []
         
     def record_attention(self, attention_dict, epoch, batch_idx=0):
-        """Record basic attention statistics"""
         stats = {}
         
         for key in attention_dict:
@@ -139,7 +133,6 @@ class AttentionMonitor:
         return stats
     
     def update_epoch_stats(self, epoch, stats):
-        """Save stats for epoch"""
         epoch_data = {'epoch': epoch}
         for key, stat_dict in stats.items():
             for stat_name, value in stat_dict.items():
@@ -149,7 +142,6 @@ class AttentionMonitor:
         self.epoch_metrics.append(epoch_data)
     
     def plot_attention_evolution(self):
-        """Plot attention metrics over time - SAVE ONLY, NO SHOW"""
         if not self.epoch_metrics:
             print("No metrics to plot")
             return
@@ -191,10 +183,9 @@ class AttentionMonitor:
         save_path = os.path.join(self.save_dir, 'attention_evolution.png')
         plt.savefig(save_path, dpi=150)
         plt.close()  # Close figure instead of show
-        print(f"Attention evolution saved to: {save_path}")
+        print(f"📊 Attention evolution saved to: {save_path}")
     
     def plot_attention_heatmaps(self, epoch=None):
-        """Generate and save attention heatmaps"""
         if not self.sample_weights:
             print("No attention weights to plot")
             return
@@ -246,10 +237,9 @@ class AttentionMonitor:
             save_path = os.path.join(self.save_dir, f'{attn_type}_heatmaps.png')
             plt.savefig(save_path, dpi=150)
             plt.close()
-            print(f"Heatmap saved to: {save_path}")
+            print(f"🔥 Heatmap saved to: {save_path}")
     
     def save_summary(self):
-        """Save summary to JSON"""
         summary = {
             'total_epochs': len(self.epoch_metrics),
             'metrics': self.epoch_metrics
@@ -258,12 +248,11 @@ class AttentionMonitor:
         with open(os.path.join(self.save_dir, 'attention_summary.json'), 'w') as f:
             json.dump(summary, f, indent=2)
         
-        print(f"Attention summary saved to {self.save_dir}")
+        print(f"✅ Attention summary saved to {self.save_dir}")
 
 
 # ============= TRAINING METRICS TRACKER =============
 class MetricsTracker:
-    """Track and save training metrics"""
     
     def __init__(self):
         self.metrics = {
@@ -280,69 +269,26 @@ class MetricsTracker:
         for key, value in kwargs.items():
             if key in self.metrics:
                 self.metrics[key].append(value)
-    
-    def plot_curves(self, save_path='training_curves.png'):
-        """Plot training curves - SAVE ONLY, NO SHOW"""
-        fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-        
-        # Loss
-        axes[0, 0].plot(self.metrics['epoch'], self.metrics['train_loss'], label='Train', marker='o', markersize=3)
-        axes[0, 0].plot(self.metrics['epoch'], self.metrics['val_loss'], label='Val', marker='s', markersize=3)
-        axes[0, 0].set_xlabel('Epoch')
-        axes[0, 0].set_ylabel('Loss')
-        axes[0, 0].set_title('Loss Curves')
-        axes[0, 0].legend()
-        axes[0, 0].grid(True, alpha=0.3)
-        
-        # AUPR
-        axes[0, 1].plot(self.metrics['epoch'], self.metrics['val_aupr'], color='green', marker='o', markersize=3)
-        axes[0, 1].set_xlabel('Epoch')
-        axes[0, 1].set_ylabel('AUPR')
-        axes[0, 1].set_title('Validation AUPR')
-        axes[0, 1].grid(True, alpha=0.3)
-        
-        # AUC
-        axes[1, 0].plot(self.metrics['epoch'], self.metrics['val_auc'], color='orange', marker='o', markersize=3)
-        axes[1, 0].set_xlabel('Epoch')
-        axes[1, 0].set_ylabel('AUC')
-        axes[1, 0].set_title('Validation AUC')
-        axes[1, 0].grid(True, alpha=0.3)
-        
-        # Learning Rate
-        axes[1, 1].plot(self.metrics['epoch'], self.metrics['learning_rate'], color='red', marker='o', markersize=3)
-        axes[1, 1].set_xlabel('Epoch')
-        axes[1, 1].set_ylabel('LR')
-        axes[1, 1].set_title('Learning Rate')
-        axes[1, 1].set_yscale('log')
-        axes[1, 1].grid(True, alpha=0.3)
-        
-        plt.suptitle('Training Progress', fontsize=14)
-        plt.tight_layout()
-        plt.savefig(save_path, dpi=150)
-        plt.close()  # Close figure instead of show
-        print(f"📈 Training curves saved to: {save_path}")
-    
+   
     def save(self, path='metrics.json'):
         """Save metrics to JSON"""
         with open(path, 'w') as f:
             json.dump(self.metrics, f, indent=2)
-
+   
+    
 
 # ============= HELPER FUNCTIONS =============
 def set_embedding_requires_grad(model, requires_grad: bool):
-    """Control embedding layer gradients"""
     model.embedding_en.weight.requires_grad = requires_grad
     model.embedding_pr.weight.requires_grad = requires_grad
 
 
 def get_num_correct(preds, labels):
-    """Calculate number of correct predictions"""
     predictions = (preds >= 0.5).float()
     return (predictions == labels).sum().item()
 
 
 def clear_memory():
-    """Clear GPU memory"""
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     gc.collect()
@@ -350,75 +296,75 @@ def clear_memory():
 
 # ============= TRAINING FUNCTIONS =============
 def train_epoch(model, dataloader, optimizer, device, attention_monitor=None, epoch=0):
-    """Train for one epoch with attention monitoring"""
     model.train()
     total_loss = 0.0
     total_correct = 0
     total_samples = 0
     batch_attention_stats = []
-    
+    all_probs = []
+    all_labels = []
+
     for batch_idx, data in enumerate(dataloader):
         enhancer_ids, promoter_ids, gene_data, labels = data
         enhancer_ids = enhancer_ids.to(device)
         promoter_ids = promoter_ids.to(device)
         gene_data = gene_data.to(device)
         labels = labels.to(device)
-        
+
         optimizer.zero_grad()
-        
-        # Forward pass
+
         outputs, attention_dict = model(enhancer_ids, promoter_ids, gene_data)
-        
-        # Record attention for first batch
+
+
         if attention_monitor and batch_idx == 0:
             stats = attention_monitor.record_attention(attention_dict, epoch, batch_idx)
-             # Ghi lại attention cho batch đầu tiên mỗi epoch
-            for key, stat_dict in stats.items():
-                print(f"  {key}:")
-                print(f"    Shape: {stat_dict.get('shape', 'N/A')}")
-                print(f"    Mean: {stat_dict['mean']:.4f}, std: {stat_dict['std']:.4f}")
-                print(f"    Max: {stat_dict['max']:.4f}, Min: {stat_dict['min']:.4f}")
-                print(f"    Sparsity: {stat_dict['sparsity']:.4f}")
-            
-        
-
             if stats:
                 batch_attention_stats.append(stats)
-        
-        # Prepare labels
-        labels = labels.unsqueeze(1).float()
-        if labels.shape == torch.Size([1, 1]):
-            labels = torch.reshape(labels, (1,))
-        
-        # Calculate loss
+
+        labels = labels.float().unsqueeze(1) if labels.dim() == 1 else labels.float()
+        labels = labels.view_as(outputs)
+
+
         loss = model.criterion(outputs, labels)
         total_loss += loss.item()
-        
-        # Backward pass
-        loss.backward()
 
-        
-        # Gradient clipping
+        loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        
         optimizer.step()
-        
-        # Track accuracy
-        total_correct += get_num_correct(outputs, labels)
-        total_samples += labels.size(0)
-        
-        # Clear memory periodically
+
+
+        with torch.no_grad():
+            probs_flat = outputs.view(-1).detach().cpu()
+            lbls_flat  = labels.view(-1).detach().cpu()
+
+            preds_bin = (probs_flat >= 0.5).float()
+            total_correct += (preds_bin == lbls_flat).sum().item()
+            total_samples += lbls_flat.numel()
+
+            all_probs.append(probs_flat)
+            all_labels.append(lbls_flat)
+
         if batch_idx % 50 == 0:
             clear_memory()
-    
+
     avg_loss = total_loss / len(dataloader)
-    accuracy = total_correct / total_samples
-    
-    return avg_loss, accuracy, batch_attention_stats
+    accuracy = total_correct / total_samples if total_samples > 0 else float("nan")
+
+    # Tính AUPR/AUC
+    all_probs = torch.cat(all_probs).numpy()
+    all_labels = torch.cat(all_labels).numpy()
+    all_probs = np.clip(all_probs, 1e-7, 1 - 1e-7)
+
+    aupr = average_precision_score(all_labels, all_probs)
+    try:
+        auc = roc_auc_score(all_labels, all_probs)
+    except ValueError:
+        auc = float("nan")
+
+    return avg_loss, accuracy, batch_attention_stats, aupr, auc
 
 
 def validate(model, dataloader, device, attention_monitor=None, epoch=0):
-    """Validation with metrics calculation"""
     model.eval()
     total_loss = 0.0
     all_preds = []
@@ -433,51 +379,44 @@ def validate(model, dataloader, device, attention_monitor=None, epoch=0):
             gene_data = gene_data.to(device)
             labels = labels.to(device)
             
-            # Forward pass
             outputs, attention_dict = model(enhancer_ids, promoter_ids, gene_data)
             
-            # Record attention for first batch
             if attention_monitor and batch_idx == 0:
                 stats = attention_monitor.record_attention(attention_dict, epoch, batch_idx)
                 if stats:
                     val_attention_stats.append(stats)
-            
-            # Prepare labels
+
             labels = labels.unsqueeze(1).float()
             if labels.shape == torch.Size([1, 1]):
                 labels = torch.reshape(labels, (1,))
-            
-            # Calculate loss
+
             loss = model.criterion(outputs, labels)
             total_loss += loss.item()
             
-            # Collect predictions
             all_preds.extend(outputs.view(-1).cpu().numpy())
             all_labels.extend(labels.view(-1).cpu().numpy())
     
-    # Calculate metrics
     avg_loss = total_loss / len(dataloader)
     aupr = average_precision_score(all_labels, all_preds)
     auc = roc_auc_score(all_labels, all_preds)
     
-    # Check prediction diversity
+
+    all_labels_np = (np.array(all_labels) >= 0.5).astype(int)
+
     pred_binary = (np.array(all_preds) >= 0.5).astype(int)
     unique_preds = np.unique(pred_binary)
     pos_ratio = np.mean(pred_binary)
+
+    acc = accuracy_score(all_labels_np, pred_binary)
     
     print(f"  Unique predictions: {unique_preds}, Positive ratio: {pos_ratio:.2%}")
     
-    return avg_loss, aupr, auc, val_attention_stats
+    return avg_loss, aupr, auc, val_attention_stats, acc
 
-
-# ============= DATA PREPARATION =============
 def prepare_data(config):
-    """Prepare data loaders"""
-    # Load dataset
     torch.serialization.add_safe_globals([CombinedDataset])
     dataset = torch.load(config.data_path, weights_only=False)
-    
-    # Create enhancer-based split
+
     enhancer_to_indices = defaultdict(list)
     for i in range(len(dataset)):
         enhancer_str = ''.join(map(str, dataset[i][0].tolist()))
@@ -486,13 +425,12 @@ def prepare_data(config):
     unique_enhancers = list(enhancer_to_indices.keys())
     enhancer_labels = [dataset[enhancer_to_indices[enh][0]][3].item() 
                       for enh in unique_enhancers]
-    
-    # Split data
+
     train_enh, test_enh = train_test_split(
         unique_enhancers,
         test_size=0.1,
         stratify=enhancer_labels,
-        random_state=config.seed
+        random_state=2025
     )
     
     train_idx = [i for enh in train_enh for i in enhancer_to_indices[enh]]
@@ -500,15 +438,13 @@ def prepare_data(config):
     
     train_dataset = Subset(dataset, train_idx)
     test_dataset = Subset(dataset, test_idx)
-    
-    # Check distribution
+
     train_labels = [train_dataset[i][3].item() for i in range(len(train_dataset))]
     test_labels = [test_dataset[i][3].item() for i in range(len(test_dataset))]
     
     print(f"Train: {len(train_dataset)} samples, Positive: {sum(train_labels)/len(train_labels):.2%}")
     print(f"Test: {len(test_dataset)} samples, Positive: {sum(test_labels)/len(test_labels):.2%}")
     
-    # Create loaders with optimization
     train_loader = DataLoader(
         train_dataset,
         batch_size=config.batch_size,
@@ -527,12 +463,7 @@ def prepare_data(config):
     
     return train_loader, val_loader
 
-
-# ============= MAIN TRAINING =============
 def main():
-    """Main training function"""
-    
-    # Setup
     config = Config()
     config.create_dirs()
     
@@ -542,115 +473,107 @@ def main():
     print(f"Seed: {config.seed}")
     print(f"Early Stopping Patience: {config.early_stop_patience}")
     print("="*60)
-    
-    # Set seeds
+
     random.seed(config.seed)
     np.random.seed(config.seed)
     torch.manual_seed(config.seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(config.seed)
-    
-    # Initialize model
+
     model = EPIModel()
     model.to(config.device)
-    
-    # Check GPU
+
     if config.device.type == 'cuda':
         print(f"Model on GPU: {all(p.is_cuda for p in model.parameters())}")
-    
-    # Initialize monitoring
+
     attention_monitor = AttentionMonitor(config.attention_dir)
     metrics_tracker = MetricsTracker()
     early_stopping = EarlyStopping(
         patience=config.early_stop_patience,
         min_delta=config.early_stop_min_delta
     )
+    torch.serialization.add_safe_globals([CombinedDataset])
+    train_dataset = torch.load(config.data_path, weights_only=False)
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=config.batch_size,
+        shuffle=True,
+        num_workers=2,
+        pin_memory=True
+    )
     
-    # Prepare data
-    train_loader, val_loader = prepare_data(config)
-    
-    # Initially freeze embeddings
-    # set_embedding_requires_grad(model, False)
-    
-    # Initialize optimizer
     optimizer = torch.optim.Adam(
         filter(lambda p: p.requires_grad, model.parameters()),
         lr=config.learning_rate,
         weight_decay=config.weight_decay
     )
-    
-    # Learning rate scheduler
+
     scheduler = MultiStepLR(optimizer, milestones=[25], gamma=0.1)
-    
-    # Training loop
+
     best_aupr = 0
     best_epoch = 0
     best_val_loss = 9999
+    best_acc = 0
+    best_auc = 0
     
     
     for epoch in range(config.num_epochs):
         print(f"\n{'='*50}")
         print(f"Epoch {epoch}/{config.num_epochs-1}")
         print(f"{'='*50}")
-        
-        # Unfreeze embeddings at specified epoch
+
         if epoch == config.unfreeze_epoch:
             print("Unfreezing embeddings for fine-tuning...")
             set_embedding_requires_grad(model, True)
-            
-            # Recreate optimizer with all parameters
+
             optimizer = torch.optim.Adam(
                 model.parameters(),
                 lr=config.fine_tune_lr,
                 weight_decay=config.weight_decay
             )
             scheduler = MultiStepLR(optimizer, milestones=[25], gamma=0.1)
-        
-        # Training
-        train_loss, train_acc, train_attention_stats = train_epoch(
+
+        train_loss, train_acc, train_attention_stats, val_aupr, val_auc, = train_epoch(
             model, train_loader, optimizer, config.device, attention_monitor, epoch
         )
-        
-        # Validation
-        val_loss, val_aupr, val_auc, val_attention_stats = validate(
-            model, val_loader, config.device, attention_monitor, epoch
-        )
-        
-        # Update attention stats
         if train_attention_stats:
             for stats in train_attention_stats:
                 attention_monitor.update_epoch_stats(epoch, stats)
         
-        # Update learning rate
         scheduler.step()
         current_lr = optimizer.param_groups[0]['lr']
-        
-        # Print metrics
+
         print(f"Train - Loss: {train_loss:.4f}, Acc: {train_acc:.4f}")
-        print(f"Val - Loss: {val_loss:.4f}, AUPR: {val_aupr:.4f}, AUC: {val_auc:.4f}")
+
         print(f"Learning rate: {current_lr:.6f}")
-        
-        # Track metrics
+
         metrics_tracker.update(
             epoch=epoch,
             train_loss=train_loss,
-            val_loss=val_loss,
             val_aupr=val_aupr,
             val_auc=val_auc,
             learning_rate=current_lr
         )
+            
+        checkpoint_path = os.path.join(config.checkpoint_dir, f'model_epoch_{epoch}.pt')
+        torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'val_aupr': val_aupr,
+                'val_auc': val_auc
+            }, checkpoint_path)
         
-        # Save checkpoint
-        if (epoch + 1) % config.save_freq == 0:
-            checkpoint_path = os.path.join(config.checkpoint_dir, f'model_epoch_{epoch}.pt')
-            torch.save(model.state_dict(), checkpoint_path)
-            print(f"Checkpoint saved: {checkpoint_path}")
-        
-        # Save best model
-        if (val_aupr > best_aupr) or (val_aupr == best_aupr and val_loss < best_val_loss):
+        print(f"Checkpoint saved: {checkpoint_path}")
+
+        print(f"AUC: {val_auc}, AUPR: {val_aupr}, best_auc: {best_auc}, best_aupr: {best_aupr}")
+
+        if (val_auc > best_auc) or (val_auc == best_auc and val_aupr >= best_aupr and  train_loss <= best_val_loss):
             best_aupr = val_aupr
-            best_val_loss = val_loss
             best_epoch = epoch
+            best_auc = val_auc
+            best_val_loss = train_loss
             best_path = os.path.join(config.best_checkpoint_dir, 'best_model.pt')
             torch.save({
                 'epoch': epoch,
@@ -659,34 +582,27 @@ def main():
                 'val_aupr': val_aupr,
                 'val_auc': val_auc
             }, best_path)
-            print(f"New best model! AUPR: {best_aupr:.4f}")
-        
-        # Early stopping check
+            print(f"New best model! AUPR: {best_aupr}")
+
         early_stopping(val_aupr)
         if early_stopping.early_stop:
             break
-        
-        # Generate plots
+
         if (epoch + 1) % config.plot_freq == 0:
             print("Generating plots...")
             attention_monitor.plot_attention_evolution()
             attention_monitor.plot_attention_heatmaps(epoch)
-            metrics_tracker.plot_curves(os.path.join(config.attention_dir, f'training_curves_epoch_{epoch}.png'))
-        
-        # Clear memory
+
         clear_memory()
-    
-    # Final summary
+
     print("\n" + "="*60)
     print("TRAINING COMPLETED!")
     print("="*60)
-    
-    # Generate final plots
+
     print("Generating final analysis...")
     attention_monitor.plot_attention_evolution()
     attention_monitor.plot_attention_heatmaps()
     attention_monitor.save_summary()
-    metrics_tracker.plot_curves(os.path.join(config.attention_dir, 'final_training_curves.png'))
     metrics_tracker.save(os.path.join(config.attention_dir, 'training_metrics.json'))
     
     print(f"Best AUPR: {best_aupr:.4f} at epoch {best_epoch}")
@@ -696,7 +612,5 @@ def main():
     
     return model, best_aupr
 
-
-# ============= RUN TRAINING =============
 if __name__ == "__main__":
     model, best_aupr = main()
