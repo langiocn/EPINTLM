@@ -1,5 +1,14 @@
 This repository contains the implementation of "EPINTLM: Residual Cross-Attention for Enhancer–Promoter Prediction with Pretrained k-mer Embeddings" for predicting enhancer–promoter interactions.
 
-**Model checkpoints**: https://drive.google.com/drive/folders/18DHZgsJqupNTnWmPrRiA3F1SrMro2q_H?usp=sharing
+## Downloads
 
-**Test dataset**: https://drive.google.com/drive/folders/147FcXyYXnAR-S4KUV6guTpQbfEFGdLw5?usp=sharing
+| Resource | Link | Folder to place |
+|---------|------|----------------|
+| Model checkpoints | https://drive.google.com/drive/folders/18DHZgsJqupNTnWmPrRiA3F1SrMro2q_H?usp=sharing | ./checkpoints/ |
+
+## Feature Extraction
+Before running the command below, make sure to edit the input file paths (FASTA, BED, and label files) for the specific cell line you want to evaluate in feature_extraction/seqgendataset.py.
+python ./feature_extraction/seqgendataset.py
+
+## Run Test
+python testepintlm.py
