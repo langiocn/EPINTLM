@@ -12,7 +12,7 @@ Download the pretrained EPINTLM checkpoint required for evaluation and copy it i
 
 ## 2. Feature Extraction
 
-Before running the command below, make sure to edit the input file paths (FASTA, BED, and label files) for the specific cell line you want to evaluate in `feature_extraction/seqgendataset.py`.
+Before running the command below, make sure to edit the input file paths (FASTA, BED, and label files) for the specific cell line you want to evaluate in `feature_extraction/seqgendataset.py`. This script will generate processed `.pt` files and save them into the `./data/` directory for use in model testing.
 
 ```bash
 python ./feature_extraction/seqgendataset.py
@@ -21,7 +21,7 @@ python ./feature_extraction/seqgendataset.py
 ---
 
 ## 3. Run Test
-Before running the command below, make sure to edit the checkpoint path in `testepintlm.py` to point to the correct pretrained model you want to evaluate.
+Before running the command below, make sure to edit the checkpoint path and the data .pt file paths in testepintlm.py so they correctly point to the pretrained model and feature files you want to evaluate.
 ```bash
 python testepintlm.py
 ```
