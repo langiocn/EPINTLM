@@ -11,7 +11,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = EPIModel().to(device)
 
 # # Load checkpoint dictionary
-checkpoint = torch.load('/content/EPIPDLF/best_checkpoints/best_model.pt', map_location=device, weights_only=False)
+checkpoint = torch.load('./checkpoints/model.pt', map_location=device, weights_only=False)
 
 
 # Load model weights
