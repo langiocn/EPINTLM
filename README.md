@@ -1,3 +1,4 @@
+#EPINTLM
 This repository contains the implementation of "EPINTLM: Enhancer–Promoter Prediction with Pretrained k-mer Embeddings and Residual Cross-Attention" for predicting enhancer–promoter interactions.
 
 ## 1. Downloads
@@ -19,7 +20,7 @@ python ./feature_extraction/seqgendataset.py
 ---
 
 ## 3. Run Test
-
+Before running the command below, make sure to edit the checkpoint path in `testepintlm.py` to point to the correct pretrained model you want to evaluate.
 ```bash
 python testepintlm.py
 ```
