@@ -26,3 +26,11 @@ Before running the command below, make sure to edit the checkpoint path and the 
 python testepintlm.py
 ```
 
+---
+
+## Citation
+
+If you use this code, please cite:
+```bibtex
+Nguyen, T. L., Kha, H. Q., Nguyen, P. K., Le, M. H. N., Le, D. T., & Quoc Khanh Le, N. (2026). EPINTLM: enhancer–promoter prediction with pretrained k-mer embeddings and residual cross-attention. Briefings in Bioinformatics, 27(1), bbag064.
+
