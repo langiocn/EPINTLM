@@ -30,7 +30,7 @@ python testepintlm.py
 
 ## Citation
 
-Please cite our paper as follows:
+If you find this work useful in your research, please cite our paper as follows:
 ```bibtex
 Nguyen, T. L., Kha, H. Q., Nguyen, P. K., Le, M. H. N., Le, D. T., & Quoc Khanh Le, N. (2026).
 EPINTLM: enhancer–promoter prediction with pretrained k-mer embeddings and residual cross-attention.
